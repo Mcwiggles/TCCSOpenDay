@@ -129,6 +129,13 @@
     <div id="hint">📱 Point camera at the Hiro marker on the wall</div>
     <div id="debug-log"></div>
 
+    <!--
+        ════════════════════════════════════════════════════
+        size="0.30"  →  your printed marker width in METRES.
+        Measure the black square edge-to-edge.
+        Print it as large as possible (A3+).
+        ════════════════════════════════════════════════════
+    -->
     <a-scene
         embedded
         arjs="sourceType: webcam; debugUIEnabled: false;"
@@ -144,22 +151,26 @@
                   smoothTolerance="0.01" smoothThreshold="5">
 
             <!--
-                WALL MARKER — no rotation needed!
-                Default a-image already faces the viewer, upright.
+                DOUBLED SIZE: width="6" height="3.4"
 
-                Y = how far below marker centre the characters sit
-                    Adjust based on your marker height from the floor:
-                    Y = -(markerHeight - 0.85)
-                    e.g. marker at 1.5m from floor → Y = -0.65
+                WALL-MOUNTED MARKER coordinate axes:
+                  X = left / right along the wall
+                  Y = up / down along the wall
+                  Z = out from the wall toward the viewer
 
-                Z = how far in front of the wall they stand
+                Y POSITION — feet on floor:
+                  Y = -(marker height from floor) + (character height ÷ 2)
+                  Example: marker at 1.5m → Y = -1.5 + 1.7 = 0.2
+
+                Z = 1.0 means 1 metre in front of the wall.
+
+                If characters face AWAY from you, add rotation="0 180 0"
             -->
             <a-image
                 src="#chars"
-                width="3"
-                height="1.7"
-                position="0 -0.65 0.5"
-                rotation="0 0 0"
+                position="0 0.2 1.0"
+                width="6"
+                height="3.4"
                 material="alphaTest: 0.5; transparent: true; side: double">
             </a-image>
 
@@ -186,7 +197,7 @@
     </div>
 
     <script>
-        /* ---- optional debug logging (tap hint 3x to show) ---- */
+        /* ---- optional debug logging (tap hint 3× to show) ---- */
         var debugTaps = 0;
         document.getElementById('hint').addEventListener('click', function () {
             debugTaps++;
@@ -206,11 +217,12 @@
 
         var savedDataURL = '';
 
-        /* ---- CAPTURE ---- */
+        /* ---- CAPTURE — composites video + forced WebGL render ---- */
         function capture() {
             var flash = document.getElementById('flash');
             flash.style.display = 'block';
 
+            /* small delay so flash is visible */
             setTimeout(function () {
                 try {
                     var scene = document.querySelector('a-scene');
@@ -219,18 +231,20 @@
                     var renderer = scene.renderer;
                     var glCanvas = renderer.domElement;
 
-                    /* Force render so buffer is fresh */
+                    /* Force an immediate render so the buffer is fresh */
                     renderer.render(scene.object3D, scene.camera);
 
-                    log('GL canvas: ' + glCanvas.width + 'x' + glCanvas.height);
+                    log('GL canvas: ' + glCanvas.width + '×' + glCanvas.height);
 
+                    /* Find the video element AR.js creates */
                     var video = document.querySelector('video');
                     if (!video) { log('No video element found'); flash.style.display = 'none'; return; }
-                    log('Video: ' + video.videoWidth + 'x' + video.videoHeight);
+                    log('Video: ' + video.videoWidth + '×' + video.videoHeight + ' readyState=' + video.readyState);
 
                     var w = glCanvas.width;
                     var h = glCanvas.height;
 
+                    /* composite canvas */
                     var tmp = document.createElement('canvas');
                     tmp.width = w;
                     tmp.height = h;
@@ -239,11 +253,11 @@
                     /* Layer 1: camera feed */
                     ctx.drawImage(video, 0, 0, w, h);
 
-                    /* Layer 2: WebGL canvas (AR objects) */
+                    /* Layer 2: WebGL canvas (AR objects with transparent bg) */
                     ctx.drawImage(glCanvas, 0, 0, w, h);
 
                     savedDataURL = tmp.toDataURL('image/png');
-                    log('Captured length: ' + savedDataURL.length);
+                    log('Captured data URL length: ' + savedDataURL.length);
 
                     document.getElementById('preview-img').src = savedDataURL;
                     document.getElementById('preview-modal').style.display = 'flex';
@@ -255,7 +269,7 @@
             }, 100);
         }
 
-        /* ---- 5-second timer ---- */
+        /* ---- 5-second timer capture ---- */
         var timerRunning = false;
         function startTimer() {
             if (timerRunning) return;
@@ -297,14 +311,14 @@
             document.getElementById('preview-modal').style.display = 'none';
         }
 
-        /* ---- verify renderer settings ---- */
+        /* ---- verify preserveDrawingBuffer on load ---- */
         document.querySelector('a-scene').addEventListener('loaded', function () {
             var r = this.renderer;
             if (r) {
                 var gl = r.getContext();
                 var attrs = gl.getContextAttributes();
-                log('preserveDrawingBuffer: ' + (attrs ? attrs.preserveDrawingBuffer : '?'));
-                log('alpha: ' + (attrs ? attrs.alpha : '?'));
+                log('preserveDrawingBuffer: ' + (attrs ? attrs.preserveDrawingBuffer : 'unknown'));
+                log('alpha: ' + (attrs ? attrs.alpha : 'unknown'));
             }
         });
     </script>
