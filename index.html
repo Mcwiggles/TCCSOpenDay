@@ -1,55 +1,125 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Life-Size AR Photos with TCCS Characters</title>
+    <title>Life-Size AR Photos</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+        /* Simple UI to guide the user */
+        .ui-container {
+            position: absolute; 
+            bottom: 20px; 
+            left: 0; 
+            width: 100%; 
+            text-align: center; 
+            z-index: 100;
+            pointer-events: none; /* Let clicks pass through to 3D scene if needed */
+        }
+        button {
+            pointer-events: auto; /* Re-enable clicks for button */
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        button:active { background: #0056b3; }
+        
+        #guide-text {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: sans-serif;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 0;
+            display: block;
+        }
+    </style>
 </head>
+
 <body style="margin: 0; overflow: hidden;">
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
-        <a-marker preset="hiro">  <!-- Print at 10cm wide: https://jeromeetienne.github.io/AR.js/data/images/HIRO.jpg -->
+
+    <div id="guide-text">Point camera at the "Hiro" marker!</div>
+
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false;" 
+        renderer="logarithmicDepthBuffer: true; preserveDrawingBuffer: true;"
+        vr-mode-ui="enabled: false">
+
+        <a-assets>
+            <img id="characters" 
+                 src="https://raw.githubusercontent.com/Mcwiggles/TCCSOpenDay/132b9b2413c9a62efb8fbc3224fea46f4bb99d74/AR%20Image%20Jesus%20%26%20TCCS%20Man.png" 
+                 crossorigin="anonymous">
+        </a-assets>
+
+        <a-marker preset="hiro" id="marker-hiro">
             <a-image 
-                src="https://raw.githubusercontent.com/Mcwiggles/TCCSOpenDay/132b9b2413c9a62efb8fbc3224fea46f4bb99d74/AR%20Image%20Jesus%20%26%20TCCS%20Man.png"
-                position="0 9 0"  <!-- Centers vertically so feet touch ground -->
-                scale="32.25 18 1"  <!-- Life-size: ~1.8m tall x ~3.225m wide -->
-                rotation="-90 0 0"  <!-- Stands upright from floor -->
-                material="transparent: true; alphaTest: 0.1"  <!-- Enables transparency in gap -->
-                animation="property: rotation; to: -90 360 0; loop: true; dur: 20000; easing: linear">  <!-- Optional slow spin; remove if unwanted -->
+                src="#characters"
+                position="0 9 0"
+                scale="32.25 18 1"
+                rotation="-90 0 0"
+                material="transparent: true; alphaTest: 0.5; side: double">
             </a-image>
         </a-marker>
+
         <a-entity camera></a-entity>
     </a-scene>
 
-    <button id="capture" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 999; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px;">Take Photo</button>
+    <div class="ui-container">
+        <button id="capture">📸 Take Photo</button>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const scene = document.querySelector('a-scene');
-            const video = scene.components['arjs-video'].videoEl;
-            const canvas3D = scene.canvas;
+            const marker = document.querySelector('#marker-hiro');
+            const guideText = document.querySelector('#guide-text');
+
+            // Hide the "Point camera" text when marker is found
+            marker.addEventListener('markerFound', () => {
+                guideText.style.display = 'none';
+            });
+            marker.addEventListener('markerLost', () => {
+                guideText.style.display = 'block';
+            });
 
             document.getElementById('capture').addEventListener('click', () => {
+                // Get the real video element created by AR.js
+                const video = document.querySelector('video');
+                const canvas3D = scene.canvas;
+
+                if (!video || !canvas3D) return;
+
                 const captureCanvas = document.createElement('canvas');
                 const width = video.videoWidth;
                 const height = video.videoHeight;
+                
                 captureCanvas.width = width;
                 captureCanvas.height = height;
                 const ctx = captureCanvas.getContext('2d');
 
-                // Draw video frame (real world)
+                // 1. Draw the Camera Feed
+                // We must handle the aspect ratio to prevent stretching
+                // AR.js sometimes centers the video with `object-fit: cover`. 
+                // For a simple capture, we draw the whole video frame:
                 ctx.drawImage(video, 0, 0, width, height);
 
-                // Overlay AR canvas
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = width;
-                tempCanvas.height = height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(canvas3D, 0, 0, width, height);
-                ctx.drawImage(tempCanvas, 0, 0, width, height);
+                // 2. Draw the 3D Scene
+                // The 3D canvas usually matches the screen size, not video resolution.
+                // We scale it to fit the capture canvas.
+                ctx.drawImage(canvas3D, 0, 0, width, height);
 
-                // Download the photo
+                // 3. Download
                 const link = document.createElement('a');
-                link.download = 'ar-photo-with-characters.png';
+                link.download = `ar-photo-${Date.now()}.png`;
                 link.href = captureCanvas.toDataURL('image/png');
                 link.click();
             });
