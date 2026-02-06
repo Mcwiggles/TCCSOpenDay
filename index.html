@@ -9,43 +9,42 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; }
         
-        /* Debug Status Bar */
-        #status-bar {
-            position: absolute; top: 0; left: 0; width: 100%; padding: 10px;
-            text-align: center; color: white; font-weight: bold; font-size: 18px;
-            z-index: 999; background: rgba(0,0,0,0.8);
-        }
-
-        /* Snap Button */
+        /* Snap Button Style */
         #snap-button {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             width: 80px; height: 80px;
-            background-color: rgba(255, 0, 0, 0.7);
+            background-color: #ff0000;
             border: 4px solid white; border-radius: 50%;
             z-index: 10; cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
         }
+        #snap-button:active { transform: translateX(-50%) scale(0.95); }
 
-        /* Preview Overlay */
+        /* Preview Overlay Style */
         #preview-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 999;
             flex-direction: column; align-items: center; justify-content: center;
         }
-        #preview-img { max-width: 90%; max-height: 80%; border: 2px solid white; }
-        #close-btn { margin-top: 20px; padding: 12px 30px; background: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer; }
+        #preview-img {
+            max-width: 90%; max-height: 80%; border: 3px solid white; box-shadow: 0 0 20px black;
+        }
+        #close-btn {
+            margin-top: 20px; padding: 12px 30px; background: white; color: black;
+            border: none; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer;
+        }
+        .msg { color: white; margin-bottom: 15px; font-size: 18px; text-align: center; }
     </style>
 </head>
 
 <body>
 
-    <div id="status-bar" style="background: orange;">Attempting to load image...</div>
-
     <div id="snap-button"></div>
 
     <div id="preview-overlay">
-        <div style="color:white; margin-bottom:15px;">Long-press to Save</div>
+        <div class="msg">Long-press image to Save Photo</div>
         <img id="preview-img" src="">
-        <button id="close-btn" onclick="document.getElementById('preview-overlay').style.display='none'">Close</button>
+        <button id="close-btn" onclick="closePreview()">Close</button>
     </div>
 
     <a-scene 
@@ -56,7 +55,7 @@
         
         <a-assets>
             <img id="chars" 
-                 src="https://cdn.jsdelivr.net/gh/Mcwiggles/TCCSOpenDay@main/characters.png" 
+                 src="https://i.postimg.cc/VkBRgHCt/characters.png" 
                  crossorigin="anonymous">
         </a-assets>
 
@@ -69,7 +68,7 @@
                 position="0 5 0" 
                 scale="18 10 1" 
                 rotation="-90 0 0"
-                material="transparent: true; alphaTest: 0.5;">
+                material="transparent: true; alphaTest: 0.5; side: double">
             </a-image>
             
         </a-marker>
@@ -78,22 +77,7 @@
     </a-scene>
 
     <script>
-        // 1. IMAGE LOADER DIAGNOSTIC
-        // This watches the image file to see if it actually downloads
-        var img = document.querySelector('#chars');
-        var status = document.querySelector('#status-bar');
-
-        img.onload = function() {
-            status.innerText = "SUCCESS: Image Loaded! Point at Marker.";
-            status.style.background = "green";
-        };
-
-        img.onerror = function() {
-            status.innerText = "ERROR: Failed to download image.";
-            status.style.background = "red";
-        };
-
-        // 2. SNAP BUTTON LOGIC
+        // Photo Capture Logic
         document.getElementById('snap-button').addEventListener('click', function () {
             let video = document.querySelector('video');
             let scene = document.querySelector('a-scene');
@@ -105,16 +89,24 @@
             canvas.height = video.videoHeight;
             let ctx = canvas.getContext('2d');
 
-            // Draw Video & Scene
+            // 1. Draw Camera Feed
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            if (scene.canvas) {
-                ctx.drawImage(scene.canvas, 0, 0, canvas.width, canvas.height);
+            
+            // 2. Draw AR Elements
+            let arCanvas = scene.canvas;
+            if (arCanvas) {
+                ctx.drawImage(arCanvas, 0, 0, canvas.width, canvas.height);
             }
 
-            // Show Preview
-            document.getElementById('preview-img').src = canvas.toDataURL('image/png');
+            // 3. Show Preview Overlay
+            let dataURL = canvas.toDataURL('image/png');
+            document.getElementById('preview-img').src = dataURL;
             document.getElementById('preview-overlay').style.display = 'flex';
         });
+
+        function closePreview() {
+            document.getElementById('preview-overlay').style.display = 'none';
+        }
     </script>
 </body>
 </html>
