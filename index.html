@@ -34,17 +34,10 @@
         }
         button:active { background: #0056b3; }
 
-        /* Debug info style */
         #debug-info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 5px;
-            font-family: monospace;
-            z-index: 200;
-            pointer-events: none;
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.7); color: white; padding: 5px;
+            font-family: monospace; z-index: 200; pointer-events: none;
         }
     </style>
 </head>
@@ -58,13 +51,13 @@
 
     <a-scene 
         embedded 
-        arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono; maxDetectionRate: 60;" 
+        arjs="sourceType: webcam; debugUIEnabled: true;" 
         renderer="logarithmicDepthBuffer: true; preserveDrawingBuffer: true;"
         vr-mode-ui="enabled: false">
 
         <a-assets>
             <img id="characters" 
-                 src="https://raw.githubusercontent.com/Mcwiggles/TCCSOpenDay/132b9b2413c9a62efb8fbc3224fea46f4bb99d74/AR%20Image%20Jesus%20%26%20TCCS%20Man.png?t=1" 
+                 src="https://raw.githubusercontent.com/Mcwiggles/TCCSOpenDay/main/characters.png" 
                  crossorigin="anonymous">
         </a-assets>
 
@@ -85,9 +78,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             const scene = document.querySelector('a-scene');
             const debugInfo = document.getElementById('debug-info');
-            
-            // Marker events for debugging
             const marker = document.querySelector('#marker-hiro');
+
             marker.addEventListener('markerFound', () => {
                 debugInfo.innerText = "Marker FOUND!";
                 debugInfo.style.background = "green";
@@ -98,41 +90,26 @@
             });
 
             document.getElementById('capture').addEventListener('click', () => {
-                // Get the video element (camera feed)
                 const video = document.querySelector('video');
                 const canvas3D = scene.canvas;
 
-                if (!video || !canvas3D) {
-                    alert("Camera not ready yet!");
-                    return;
-                }
+                if (!video || !canvas3D) return;
 
                 try {
                     const captureCanvas = document.createElement('canvas');
-                    const width = video.videoWidth;
-                    const height = video.videoHeight;
-                    
-                    captureCanvas.width = width;
-                    captureCanvas.height = height;
+                    captureCanvas.width = video.videoWidth;
+                    captureCanvas.height = video.videoHeight;
                     const ctx = captureCanvas.getContext('2d');
 
-                    // 1. Draw Camera Feed
-                    // We draw the video scaling it to cover the canvas
-                    ctx.drawImage(video, 0, 0, width, height);
+                    ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+                    ctx.drawImage(canvas3D, 0, 0, captureCanvas.width, captureCanvas.height);
 
-                    // 2. Draw 3D Scene (AR Content)
-                    // We must scale the 3D canvas to match the video dimensions
-                    ctx.drawImage(canvas3D, 0, 0, width, height);
-
-                    // 3. Download
                     const link = document.createElement('a');
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    link.download = `TCCS-AR-Photo-${timestamp}.png`;
+                    link.download = `TCCS-AR-${Date.now()}.png`;
                     link.href = captureCanvas.toDataURL('image/png');
                     link.click();
-                } catch (err) {
-                    console.error(err);
-                    alert("Error saving photo: " + err.message + "\n(Make sure you are using HTTPS)");
+                } catch (e) {
+                    alert("Save failed: " + e.message);
                 }
             });
         });
