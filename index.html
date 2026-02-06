@@ -139,70 +139,27 @@
             <img id="chars" src="https://i.postimg.cc/VkBRgHCt/characters.png" crossorigin="anonymous">
         </a-assets>
 
-        <!--
-            ════════════════════════════════════════════════════
-            MARKER ON THE WALL
-            size = printed marker width in metres (measure it)
-            ════════════════════════════════════════════════════
-        -->
         <a-marker preset="hiro" size="0.30"
                   smooth="true" smoothCount="10"
                   smoothTolerance="0.01" smoothThreshold="5">
 
             <!--
-                ┌─────────────────────────────────────────────┐
-                │  WALL-MOUNTED MARKER COORDINATE SYSTEM      │
-                │                                             │
-                │  Marker sits in X-Y plane on the wall:      │
-                │    X = left / right along the wall          │
-                │    Y = up / down along the wall             │
-                │    Z = out from the wall toward the viewer  │
-                │                                             │
-                │  Default a-image sits in the X-Y plane      │
-                │  (flat against the wall, facing viewer).    │
-                │                                             │
-                │  We ROTATE -90° around X so the image       │
-                │  tilts forward and stands on the floor,     │
-                │  perpendicular to the wall.                 │
-                │                                             │
-                │  After rotation:                            │
-                │    - image width still runs along X         │
-                │    - image height now runs along Z          │
-                │      (toward/away from viewer)              │
-                │    - the image faces upward (marker Y)      │
-                │                                             │
-                │  So we also rotate 180° around the NEW      │
-                │  facing axis to flip it right-side-up.      │
-                │                                             │
-                │  POSITIONING (after rotation):              │
-                │    Y = how far DOWN from the marker centre  │
-                │        the image centre sits                │
-                │    Z = how far out from the wall            │
-                │                                             │
-                │  ► MARKER_HEIGHT: measure centre of your    │
-                │    printed marker from the floor (metres).  │
-                │    Default: 1.5 m                           │
-                │                                             │
-                │  Character height  = 1.7 m                  │
-                │  Aspect ratio      ≈ 1.76 : 1              │
-                │  Character width   = 1.7 × 1.76 ≈ 3.0 m   │
-                │                                             │
-                │  Y position:                                │
-                │    -(MARKER_HEIGHT) + (charHeight / 2)      │
-                │    = -1.5 + 0.85 = -0.65                    │
-                │                                             │
-                │  Z position:                                │
-                │    half the image height forward so the     │
-                │    image stands just in front of the wall   │
-                │    = 1.7 / 2 = 0.85                         │
-                └─────────────────────────────────────────────┘
+                WALL MARKER — no rotation needed!
+                Default a-image already faces the viewer, upright.
+
+                Y = how far below marker centre the characters sit
+                    Adjust based on your marker height from the floor:
+                    Y = -(markerHeight - 0.85)
+                    e.g. marker at 1.5m from floor → Y = -0.65
+
+                Z = how far in front of the wall they stand
             -->
             <a-image
                 src="#chars"
                 width="3"
                 height="1.7"
-                position="0 -0.65 0.85"
-                rotation="-90 0 0"
+                position="0 -0.65 0.5"
+                rotation="0 0 0"
                 material="alphaTest: 0.5; transparent: true; side: double">
             </a-image>
 
@@ -229,7 +186,7 @@
     </div>
 
     <script>
-        /* ---- optional debug logging (tap hint 3× to show) ---- */
+        /* ---- optional debug logging (tap hint 3x to show) ---- */
         var debugTaps = 0;
         document.getElementById('hint').addEventListener('click', function () {
             debugTaps++;
@@ -265,11 +222,11 @@
                     /* Force render so buffer is fresh */
                     renderer.render(scene.object3D, scene.camera);
 
-                    log('GL canvas: ' + glCanvas.width + '×' + glCanvas.height);
+                    log('GL canvas: ' + glCanvas.width + 'x' + glCanvas.height);
 
                     var video = document.querySelector('video');
                     if (!video) { log('No video element found'); flash.style.display = 'none'; return; }
-                    log('Video: ' + video.videoWidth + '×' + video.videoHeight);
+                    log('Video: ' + video.videoWidth + 'x' + video.videoHeight);
 
                     var w = glCanvas.width;
                     var h = glCanvas.height;
