@@ -1,84 +1,24 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <title>Life-Size AR Photos</title>
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <head>
+    <!-- Include A-Frame library (use a recent version for better compatibility) -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <!-- Include AR.js for A-Frame (marker-based tracking) -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    
-    <style>
-        body { margin: 0; overflow: hidden; }
-        .ui-container { position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 100; pointer-events: none; }
-        button { pointer-events: auto; padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 50px; font-size: 18px; font-weight: bold; cursor: pointer; }
-        #debug-info { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px; font-family: monospace; z-index: 200; }
-    </style>
-</head>
-
-<body>
-    <div id="debug-info">System Ready. Scan Hiro.</div>
-    <div class="ui-container"><button id="capture">📸 Take Photo</button></div>
-
-    <a-scene 
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: true;" 
-        renderer="logarithmicDepthBuffer: true; preserveDrawingBuffer: true;"
-        vr-mode-ui="enabled: false">
-
-        <a-assets>
-            <img id="characters" src="characters.png">
-        </a-assets>
-
-<a-marker preset="hiro" id="marker-hiro">
-    <a-image 
-        src="characters.png"
-        position="0 0.85 0"
-        scale="3 1.7 1"
-        rotation="-90 0 0"
-        material="color: red; transparent: true; alphaTest: 0.5; side: double">
-    </a-image>
-</a-marker>
-
-        <a-entity camera></a-entity>
+  </head>
+  <body style="margin: 0px; overflow: hidden;">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+      <!-- Use a custom marker pattern generated from your characters.png -->
+      <!-- Step 1: Go to https://jeromeetienne.github.io/AR.js/three.js/examples/marker-training/examples/generator.html -->
+      <!-- Step 2: Upload characters.png, generate and download the .patt file -->
+      <!-- Step 3: Upload the .patt file to your GitHub repo (e.g., as characters.patt) -->
+      <!-- Step 4: Replace the url below with the raw GitHub URL to your .patt file -->
+      <a-marker type="pattern" url="https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/characters.patt">
+        <!-- AR content: A semi-transparent box appearing on the marker (as in the article) -->
+        <a-box position="0 0.5 0" material="opacity: 0.5;"></a-box>
+      </a-marker>
+      <!-- Camera entity -->
+      <a-entity camera></a-entity>
     </a-scene>
-
-    <script>
-        // Debugging Logic
-        const marker = document.querySelector('#marker-hiro');
-        const debugInfo = document.getElementById('debug-info');
-
-        marker.addEventListener('markerFound', () => {
-            debugInfo.innerText = "Marker FOUND! (Look for Red or Image)";
-            debugInfo.style.background = "green";
-        });
-        marker.addEventListener('markerLost', () => {
-            debugInfo.innerText = "Searching for Hiro...";
-            debugInfo.style.background = "rgba(0,0,0,0.7)";
-        });
-
-        // Screenshot Logic
-        document.getElementById('capture').addEventListener('click', () => {
-            const video = document.querySelector('video');
-            const scene = document.querySelector('a-scene');
-            const canvas3D = scene.canvas;
-            
-            // Create a canvas to combine them
-            const captureCanvas = document.createElement('canvas');
-            captureCanvas.width = video.videoWidth;
-            captureCanvas.height = video.videoHeight;
-            const ctx = captureCanvas.getContext('2d');
-
-            // Draw Video & 3D
-            ctx.drawImage(video, 0, 0);
-            ctx.drawImage(canvas3D, 0, 0, captureCanvas.width, captureCanvas.height);
-
-            // Save
-            const link = document.createElement('a');
-            link.download = `TCCS-AR-${Date.now()}.png`;
-            link.href = captureCanvas.toDataURL('image/png');
-            link.click();
-        });
-    </script>
-</body>
+  </body>
 </html>
-
