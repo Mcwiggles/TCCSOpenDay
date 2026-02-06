@@ -1,49 +1,97 @@
 <!DOCTYPE html>
 <html>
-<body style="margin: 0; overflow: hidden;">
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<head>
+    <title>AR Photo Booth</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        
+        /* The Snap Button */
+        #snap-button {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 80px; height: 80px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border: 4px solid white; border-radius: 50%;
+            z-index: 10; cursor: pointer;
+        }
+        #snap-button:active { background-color: white; }
 
-    <button id="snap" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 15px 30px; font-size: 18px; border-radius: 25px; background: #E4002B; color: white; border: 2px solid white;">
-        📸 Take Photo
-    </button>
+        /* The "Photo Preview" Overlay (Hidden by default) */
+        #preview-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 20;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        #preview-img {
+            width: 90%; max-height: 80%; border: 5px solid white; border-radius: 10px;
+        }
+        #close-btn {
+            margin-top: 20px; padding: 10px 30px; background: white; color: black;
+            border: none; border-radius: 20px; font-weight: bold; font-size: 16px;
+        }
+        .instructions { color: white; margin-bottom: 10px; }
+    </style>
+</head>
+
+<body>
+
+    <div id="snap-button"></div>
+
+    <div id="preview-overlay">
+        <div class="instructions">Long-press image to save!</div>
+        <img id="preview-img" src="">
+        <button id="close-btn" onclick="closePreview()">Close & Retake</button>
+    </div>
 
     <a-scene embedded arjs renderer="logarithmicDepthBuffer: true; preserveDrawingBuffer: true;" vr-mode-ui="enabled: false">
         
         <a-marker preset="hiro">
+            
+            <a-box position="0 0.5 0" color="yellow" opacity="0.5" scale="1 1 1"></a-box>
+
             <a-image 
                 src="characters.png" 
                 position="0 5 0" 
                 scale="18 10 1" 
                 rotation="-90 0 0">
             </a-image>
+
         </a-marker>
 
         <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-        document.getElementById('snap').addEventListener('click', function () {
-            // Grab the video (camera) and the AR scene (3D)
+        document.getElementById('snap-button').addEventListener('click', function () {
+            // 1. Get the camera feed (video) and the AR 3D layer (canvas)
             let video = document.querySelector('video');
-            let scene = document.querySelector('a-scene').canvas;
+            let scene = document.querySelector('a-scene');
+            let canvas3D = scene.canvas;
+
+            // 2. Create a temporary canvas to merge them
+            let tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            let ctx = tempCanvas.getContext('2d');
+
+            // 3. Draw Video (Background)
+            ctx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
             
-            // Combine them on a new canvas
-            let canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            let ctx = canvas.getContext('2d');
-            
-            // Draw real world, then draw characters on top
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            ctx.drawImage(scene, 0, 0, canvas.width, canvas.height);
-            
-            // Trigger download
-            let link = document.createElement('a');
-            link.download = 'WebAR-Photo.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            // 4. Draw AR Object (Foreground) - Handle centering
+            // AR.js sometimes offsets the canvas, so we simply draw it full size
+            ctx.drawImage(canvas3D, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            // 5. Convert to Image URL and show in overlay
+            // This bypasses the "Invalid Download URL" error by letting the browser handle the display
+            let dataURL = tempCanvas.toDataURL('image/png');
+            document.getElementById('preview-img').src = dataURL;
+            document.getElementById('preview-overlay').style.display = 'flex';
         });
+
+        function closePreview() {
+            document.getElementById('preview-overlay').style.display = 'none';
+        }
     </script>
 </body>
 </html>
