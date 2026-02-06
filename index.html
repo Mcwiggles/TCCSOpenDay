@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Life-Size AR Photos with TCCS Characters</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+        <a-marker preset="hiro">  <!-- Print at 10cm wide: https://jeromeetienne.github.io/AR.js/data/images/HIRO.jpg -->
+            <a-image 
+                src="https://raw.githubusercontent.com/Mcwiggles/TCCSOpenDay/132b9b2413c9a62efb8fbc3224fea46f4bb99d74/AR%20Image%20Jesus%20%26%20TCCS%20Man.png"
+                position="0 9 0"  <!-- Centers vertically so feet touch ground -->
+                scale="32.25 18 1"  <!-- Life-size: ~1.8m tall x ~3.225m wide -->
+                rotation="-90 0 0"  <!-- Stands upright from floor -->
+                material="transparent: true; alphaTest: 0.1"  <!-- Enables transparency in gap -->
+                animation="property: rotation; to: -90 360 0; loop: true; dur: 20000; easing: linear">  <!-- Optional slow spin; remove if unwanted -->
+            </a-image>
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <button id="capture" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 999; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px;">Take Photo</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const scene = document.querySelector('a-scene');
+            const video = scene.components['arjs-video'].videoEl;
+            const canvas3D = scene.canvas;
+
+            document.getElementById('capture').addEventListener('click', () => {
+                const captureCanvas = document.createElement('canvas');
+                const width = video.videoWidth;
+                const height = video.videoHeight;
+                captureCanvas.width = width;
+                captureCanvas.height = height;
+                const ctx = captureCanvas.getContext('2d');
+
+                // Draw video frame (real world)
+                ctx.drawImage(video, 0, 0, width, height);
+
+                // Overlay AR canvas
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(canvas3D, 0, 0, width, height);
+                ctx.drawImage(tempCanvas, 0, 0, width, height);
+
+                // Download the photo
+                const link = document.createElement('a');
+                link.download = 'ar-photo-with-characters.png';
+                link.href = captureCanvas.toDataURL('image/png');
+                link.click();
+            });
+        });
+    </script>
+</body>
+</html>
