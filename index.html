@@ -129,13 +129,6 @@
     <div id="hint">📱 Point camera at the Hiro marker on the wall</div>
     <div id="debug-log"></div>
 
-    <!--
-        ════════════════════════════════════════════════════
-        size="0.30"  →  your printed marker width in METRES.
-        Measure the black square edge-to-edge.
-        Print it as large as possible (A3+).
-        ════════════════════════════════════════════════════
-    -->
     <a-scene
         embedded
         arjs="sourceType: webcam; debugUIEnabled: false;"
@@ -146,31 +139,44 @@
             <img id="chars" src="https://i.postimg.cc/VkBRgHCt/characters.png" crossorigin="anonymous">
         </a-assets>
 
-        <a-marker preset="hiro" size="0.30"
+        <!--
+            ╔══════════════════════════════════════════════════════╗
+            ║  IMPORTANT — MEASURE YOUR MARKER!                   ║
+            ║                                                      ║
+            ║  Measure the WIDTH of the full black-bordered area   ║
+            ║  of your printed Hiro marker in centimetres.         ║
+            ║  Convert to metres and put it in size="…" below.     ║
+            ║                                                      ║
+            ║  Examples:                                           ║
+            ║    8 cm  → size="0.08"                               ║
+            ║   16 cm  → size="0.16"                               ║
+            ║   20 cm  → size="0.20"                               ║
+            ╚══════════════════════════════════════════════════════╝
+        -->
+        <a-marker preset="hiro" size="0.165"
                   smooth="true" smoothCount="10"
                   smoothTolerance="0.01" smoothThreshold="5">
 
             <!--
-                DOUBLED SIZE: width="6" height="3.4"
+                WALL-MOUNTED MARKER — No rotation needed.
+                The image naturally faces the viewer, upright.
 
-                WALL-MOUNTED MARKER coordinate axes:
-                  X = left / right along the wall
-                  Y = up / down along the wall
-                  Z = out from the wall toward the viewer
+                position:
+                  X = 0        → centred horizontally on marker
+                  Y = -0.75    → below marker so feet hit the floor
+                                  (adjust based on marker height on wall)
+                  Z = 0.4      → 40 cm in front of the wall
 
-                Y POSITION — feet on floor:
-                  Y = -(marker height from floor) + (character height ÷ 2)
-                  Example: marker at 1.5m → Y = -1.5 + 1.7 = 0.2
-
-                Z = 1.0 means 1 metre in front of the wall.
-
-                If characters face AWAY from you, add rotation="0 180 0"
+                width / height → real-world metres
+                  width  3.0 m → ~two life-size characters side by side
+                  height 1.7 m → life-size height
             -->
             <a-image
                 src="#chars"
-                position="0 0.2 1.0"
-                width="6"
-                height="3.4"
+                width="3.0"
+                height="1.7"
+                position="0 -0.75 0.4"
+                rotation="0 0 0"
                 material="alphaTest: 0.5; transparent: true; side: double">
             </a-image>
 
@@ -197,7 +203,7 @@
     </div>
 
     <script>
-        /* ---- optional debug logging (tap hint 3× to show) ---- */
+        /* ---- optional debug logging (tap hint 3x to show) ---- */
         var debugTaps = 0;
         document.getElementById('hint').addEventListener('click', function () {
             debugTaps++;
@@ -217,12 +223,11 @@
 
         var savedDataURL = '';
 
-        /* ---- CAPTURE — composites video + forced WebGL render ---- */
+        /* ---- CAPTURE ---- */
         function capture() {
             var flash = document.getElementById('flash');
             flash.style.display = 'block';
 
-            /* small delay so flash is visible */
             setTimeout(function () {
                 try {
                     var scene = document.querySelector('a-scene');
@@ -231,20 +236,18 @@
                     var renderer = scene.renderer;
                     var glCanvas = renderer.domElement;
 
-                    /* Force an immediate render so the buffer is fresh */
+                    /* Force render so buffer is fresh */
                     renderer.render(scene.object3D, scene.camera);
 
-                    log('GL canvas: ' + glCanvas.width + '×' + glCanvas.height);
+                    log('GL canvas: ' + glCanvas.width + 'x' + glCanvas.height);
 
-                    /* Find the video element AR.js creates */
                     var video = document.querySelector('video');
                     if (!video) { log('No video element found'); flash.style.display = 'none'; return; }
-                    log('Video: ' + video.videoWidth + '×' + video.videoHeight + ' readyState=' + video.readyState);
+                    log('Video: ' + video.videoWidth + 'x' + video.videoHeight);
 
                     var w = glCanvas.width;
                     var h = glCanvas.height;
 
-                    /* composite canvas */
                     var tmp = document.createElement('canvas');
                     tmp.width = w;
                     tmp.height = h;
@@ -253,11 +256,11 @@
                     /* Layer 1: camera feed */
                     ctx.drawImage(video, 0, 0, w, h);
 
-                    /* Layer 2: WebGL canvas (AR objects with transparent bg) */
+                    /* Layer 2: WebGL canvas (AR objects) */
                     ctx.drawImage(glCanvas, 0, 0, w, h);
 
                     savedDataURL = tmp.toDataURL('image/png');
-                    log('Captured data URL length: ' + savedDataURL.length);
+                    log('Captured length: ' + savedDataURL.length);
 
                     document.getElementById('preview-img').src = savedDataURL;
                     document.getElementById('preview-modal').style.display = 'flex';
@@ -269,7 +272,7 @@
             }, 100);
         }
 
-        /* ---- 5-second timer capture ---- */
+        /* ---- 5-second timer ---- */
         var timerRunning = false;
         function startTimer() {
             if (timerRunning) return;
@@ -311,14 +314,14 @@
             document.getElementById('preview-modal').style.display = 'none';
         }
 
-        /* ---- verify preserveDrawingBuffer on load ---- */
+        /* ---- verify renderer settings ---- */
         document.querySelector('a-scene').addEventListener('loaded', function () {
             var r = this.renderer;
             if (r) {
                 var gl = r.getContext();
                 var attrs = gl.getContextAttributes();
-                log('preserveDrawingBuffer: ' + (attrs ? attrs.preserveDrawingBuffer : 'unknown'));
-                log('alpha: ' + (attrs ? attrs.alpha : 'unknown'));
+                log('preserveDrawingBuffer: ' + (attrs ? attrs.preserveDrawingBuffer : '?'));
+                log('alpha: ' + (attrs ? attrs.alpha : '?'));
             }
         });
     </script>
