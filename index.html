@@ -1,329 +1,371 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AR Photo Booth</title>
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+<meta charset="utf-8">
+<title>AR Photo Booth</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,maximum-scale=1">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+body{touch-action:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;-webkit-user-select:none;user-select:none}
 
-        #controls {
-            position: fixed;
-            bottom: 28px;
-            left: 0; right: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 24px;
-            z-index: 9999;
-        }
+#camera{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1}
 
-        .btn-shutter {
-            width: 74px; height: 74px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.25);
-            border: 4px solid white;
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .btn-shutter::after {
-            content: ''; display: block;
-            width: 56px; height: 56px;
-            border-radius: 50%; background: white;
-        }
-        .btn-shutter:active::after { background: #ccc; }
+#characters{
+    position:fixed;z-index:10;
+    touch-action:none;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;
+    pointer-events:auto;
+    filter:drop-shadow(0 4px 16px rgba(0,0,0,0.35));
+    transition:filter 0.15s;
+}
+#characters.dragging{filter:drop-shadow(0 8px 28px rgba(0,0,0,0.5))}
 
-        .btn-timer {
-            width: 52px; height: 52px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            border: 2px solid rgba(255,255,255,0.7);
-            color: white; font-size: 14px; font-weight: 700;
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .btn-timer:active { background: rgba(255,255,255,0.35); }
+#controls{
+    position:fixed;bottom:28px;left:0;right:0;z-index:100;
+    display:flex;justify-content:center;align-items:center;gap:24px;
+    pointer-events:none;
+}
+#controls>*{pointer-events:auto}
 
-        #countdown-display {
-            display: none;
-            position: fixed; inset: 0;
-            z-index: 9998;
-            align-items: center; justify-content: center;
-            pointer-events: none;
-        }
-        #countdown-display span {
-            font-size: 160px; font-weight: 800;
-            color: white;
-            text-shadow: 0 0 40px rgba(0,0,0,0.5);
-            animation: pop 0.5s ease;
-        }
-        @keyframes pop {
-            0%   { transform: scale(1.6); opacity: 0; }
-            100% { transform: scale(1);   opacity: 1; }
-        }
+.btn-shutter{
+    width:74px;height:74px;border-radius:50%;
+    background:rgba(255,255,255,0.25);border:4px solid white;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+}
+.btn-shutter::after{content:'';width:56px;height:56px;border-radius:50%;background:white}
+.btn-shutter:active::after{background:#ccc}
 
-        #flash {
-            display: none;
-            position: fixed; inset: 0;
-            background: white; z-index: 9997;
-            pointer-events: none;
-        }
+.btn-round{
+    width:52px;height:52px;border-radius:50%;
+    background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.7);
+    color:white;font-size:18px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+}
+.btn-round:active{background:rgba(255,255,255,0.35)}
 
-        #preview-modal {
-            display: none;
-            position: fixed; inset: 0;
-            background: rgba(0,0,0,0.92);
-            z-index: 10000;
-            flex-direction: column;
-            align-items: center; justify-content: center;
-            padding: 20px;
-        }
-        #preview-modal img {
-            max-width: 92%; max-height: 60vh;
-            border-radius: 12px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
-        }
-        .modal-actions {
-            display: flex; gap: 16px; margin-top: 28px;
-        }
-        .modal-actions button {
-            padding: 14px 32px;
-            font-size: 16px; font-weight: 600;
-            border: none; border-radius: 28px;
-            cursor: pointer; color: white;
-        }
-        .btn-save    { background: #22c55e; }
-        .btn-save:active    { background: #16a34a; }
-        .btn-dismiss { background: #6b7280; }
-        .btn-dismiss:active { background: #4b5563; }
+#flash{display:none;position:fixed;inset:0;background:white;z-index:999;pointer-events:none}
 
-        #hint {
-            position: fixed; top: 14px;
-            left: 50%; transform: translateX(-50%);
-            z-index: 9999;
-            background: rgba(0,0,0,0.72);
-            color: white; padding: 10px 24px;
-            border-radius: 22px; font-size: 14px;
-            text-align: center; pointer-events: none;
-            transition: opacity 0.8s;
-        }
+#countdown-display{
+    display:none;position:fixed;inset:0;z-index:998;
+    align-items:center;justify-content:center;pointer-events:none;
+}
+#countdown-display span{
+    font-size:160px;font-weight:800;color:white;
+    text-shadow:0 0 40px rgba(0,0,0,0.5);
+}
+@keyframes pop{0%{transform:scale(1.6);opacity:0}100%{transform:scale(1);opacity:1}}
 
-        #debug-log {
-            position: fixed; top: 50px;
-            left: 10px; right: 10px;
-            z-index: 9999;
-            background: rgba(0,0,0,0.7);
-            color: #0f0; padding: 10px;
-            border-radius: 8px; font-size: 11px;
-            font-family: monospace;
-            max-height: 120px; overflow-y: auto;
-            display: none;
-        }
-    </style>
+#preview-modal{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);
+    z-index:10000;flex-direction:column;align-items:center;justify-content:center;padding:20px;
+}
+#preview-modal img{max-width:92%;max-height:60vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.6)}
+.modal-actions{display:flex;gap:16px;margin-top:28px}
+.modal-actions button{
+    padding:14px 32px;font-size:16px;font-weight:600;
+    border:none;border-radius:28px;cursor:pointer;color:white;
+}
+.btn-save{background:#22c55e}.btn-save:active{background:#16a34a}
+.btn-dismiss{background:#6b7280}.btn-dismiss:active{background:#4b5563}
+
+#hint{
+    position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;
+    background:rgba(0,0,0,0.72);color:white;padding:10px 24px;
+    border-radius:22px;font-size:14px;text-align:center;pointer-events:none;
+    transition:opacity 0.8s;
+}
+#error-msg{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;
+    background:rgba(200,0,0,0.85);color:white;padding:20px 32px;
+    border-radius:16px;font-size:16px;text-align:center;display:none;
+}
+</style>
 </head>
 <body>
 
-    <div id="hint">📱 Point camera at the Hiro marker on the wall</div>
-    <div id="debug-log"></div>
+<div id="hint">👆 Drag to move · Pinch to resize</div>
+<div id="error-msg" ></div>
 
-    <a-scene
-        embedded
-        arjs="sourceType: webcam; debugUIEnabled: false;"
-        renderer="preserveDrawingBuffer: true; alpha: true; antialias: true;"
-        vr-mode-ui="enabled: false">
+<video id="camera" autoplay playsinline muted></video>
 
-        <a-assets>
-            <img id="chars" src="https://i.postimg.cc/VkBRgHCt/characters.png" crossorigin="anonymous">
-        </a-assets>
+<img id="characters"
+     src="https://i.postimg.cc/VkBRgHCt/characters.png"
+     crossorigin="anonymous"
+     draggable="false"
+     alt="Characters">
 
-        <!--
-            ╔══════════════════════════════════════════════════════╗
-            ║  IMPORTANT — MEASURE YOUR MARKER!                   ║
-            ║                                                      ║
-            ║  Measure the WIDTH of the full black-bordered area   ║
-            ║  of your printed Hiro marker in centimetres.         ║
-            ║  Convert to metres and put it in size="…" below.     ║
-            ║                                                      ║
-            ║  Examples:                                           ║
-            ║    8 cm  → size="0.08"                               ║
-            ║   16 cm  → size="0.16"                               ║
-            ║   20 cm  → size="0.20"                               ║
-            ╚══════════════════════════════════════════════════════╝
-        -->
-        <a-marker preset="hiro" size="0.165"
-                  smooth="true" smoothCount="10"
-                  smoothTolerance="0.01" smoothThreshold="5">
+<div id="controls">
+    <div class="btn-round" onclick="startTimer()">5s</div>
+    <div class="btn-shutter" onclick="capture()"></div>
+    <div class="btn-round" onclick="resetPosition()">↺</div>
+</div>
 
-            <!--
-                WALL-MOUNTED MARKER — No rotation needed.
-                The image naturally faces the viewer, upright.
+<div id="flash"></div>
+<div id="countdown-display"><span id="cd-num"></span></div>
 
-                position:
-                  X = 0        → centred horizontally on marker
-                  Y = -0.75    → below marker so feet hit the floor
-                                  (adjust based on marker height on wall)
-                  Z = 0.4      → 40 cm in front of the wall
-
-                width / height → real-world metres
-                  width  3.0 m → ~two life-size characters side by side
-                  height 1.7 m → life-size height
-            -->
-            <a-image
-                src="#chars"
-                width="3.0"
-                height="1.7"
-                position="0 -0.75 0.4"
-                rotation="0 0 0"
-                material="alphaTest: 0.5; transparent: true; side: double">
-            </a-image>
-
-        </a-marker>
-
-        <a-entity camera></a-entity>
-    </a-scene>
-
-    <!-- ===== UI ===== -->
-    <div id="controls">
-        <div class="btn-timer" id="timer-btn" onclick="startTimer()">5 s</div>
-        <div class="btn-shutter" onclick="capture()"></div>
+<div id="preview-modal">
+    <img id="preview-img" src="" alt="Photo">
+    <div class="modal-actions">
+        <button class="btn-save" onclick="savePhoto()">💾 Save</button>
+        <button class="btn-dismiss" onclick="closePreview()">✕ Close</button>
     </div>
+</div>
 
-    <div id="countdown-display"><span id="cd-num"></span></div>
-    <div id="flash"></div>
+<script>
+(function(){
+'use strict';
 
-    <div id="preview-modal">
-        <img id="preview-img" src="" alt="Your AR Photo">
-        <div class="modal-actions">
-            <button class="btn-save" onclick="savePhoto()">💾 Save Photo</button>
-            <button class="btn-dismiss" onclick="closePreview()">✕ Close</button>
-        </div>
-    </div>
+var video = document.getElementById('camera');
+var chars = document.getElementById('characters');
+var hint  = document.getElementById('hint');
 
-    <script>
-        /* ---- optional debug logging (tap hint 3x to show) ---- */
-        var debugTaps = 0;
-        document.getElementById('hint').addEventListener('click', function () {
-            debugTaps++;
-            if (debugTaps >= 3) document.getElementById('debug-log').style.display = 'block';
+/* ========== CAMERA ========== */
+async function startCamera(){
+    try{
+        var stream = await navigator.mediaDevices.getUserMedia({
+            video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
+            audio:false
         });
-        function log(msg) {
-            console.log(msg);
-            var d = document.getElementById('debug-log');
-            if (d) d.textContent += msg + '\n';
+        video.srcObject = stream;
+    }catch(e){
+        try{
+            var stream2 = await navigator.mediaDevices.getUserMedia({video:true});
+            video.srcObject = stream2;
+        }catch(e2){
+            showError('Camera access denied.<br>Please allow camera and reload.');
         }
+    }
+}
+startCamera();
 
-        /* ---- hide hint after 6 s ---- */
-        setTimeout(function () {
-            var h = document.getElementById('hint');
-            if (h) { h.style.opacity = '0'; setTimeout(function () { h.remove(); }, 900); }
-        }, 6000);
+function showError(msg){
+    var el = document.getElementById('error-msg');
+    el.innerHTML = msg; el.style.display = 'block';
+}
 
-        var savedDataURL = '';
+/* ========== CHARACTER STATE ========== */
+var baseW = 0, baseH = 0;
+var posX = 0, posY = 0;
+var userScale = 1;
 
-        /* ---- CAPTURE ---- */
-        function capture() {
-            var flash = document.getElementById('flash');
-            flash.style.display = 'block';
+chars.onload = function(){
+    var aspect = chars.naturalHeight / chars.naturalWidth;
+    baseW = window.innerWidth * 0.65;
+    baseH = baseW * aspect;
+    resetPosition();
+};
+chars.onerror = function(){
+    showError('Character image failed to load.<br>Check your internet connection.');
+};
 
-            setTimeout(function () {
-                try {
-                    var scene = document.querySelector('a-scene');
-                    if (!scene || !scene.renderer) { log('No scene/renderer'); flash.style.display = 'none'; return; }
+function resetPosition(){
+    userScale = 1;
+    posX = (window.innerWidth - baseW) / 2;
+    posY = window.innerHeight - baseH - 130;
+    applyPos();
+}
+window.resetPosition = resetPosition;
 
-                    var renderer = scene.renderer;
-                    var glCanvas = renderer.domElement;
+function applyPos(){
+    var w = baseW * userScale;
+    chars.style.width  = w + 'px';
+    chars.style.height = 'auto';
+    chars.style.left   = posX + 'px';
+    chars.style.top    = posY + 'px';
+}
 
-                    /* Force render so buffer is fresh */
-                    renderer.render(scene.object3D, scene.camera);
+function displayedSize(){
+    return { w: baseW * userScale, h: baseH * userScale };
+}
 
-                    log('GL canvas: ' + glCanvas.width + 'x' + glCanvas.height);
+/* ========== TOUCH ========== */
+var dragging = false, pinching = false;
+var dragTX, dragTY, dragPX, dragPY;
+var pinchD0, pinchS0, pinchCX0, pinchCY0, pinchPX0, pinchPY0;
 
-                    var video = document.querySelector('video');
-                    if (!video) { log('No video element found'); flash.style.display = 'none'; return; }
-                    log('Video: ' + video.videoWidth + 'x' + video.videoHeight);
+chars.addEventListener('touchstart', onTS, {passive:false});
+document.addEventListener('touchmove', onTM, {passive:false});
+document.addEventListener('touchend',  onTE, {passive:false});
 
-                    var w = glCanvas.width;
-                    var h = glCanvas.height;
+function hypot(t){
+    var dx = t[1].clientX - t[0].clientX;
+    var dy = t[1].clientY - t[0].clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+}
 
-                    var tmp = document.createElement('canvas');
-                    tmp.width = w;
-                    tmp.height = h;
-                    var ctx = tmp.getContext('2d');
+function onTS(e){
+    e.preventDefault();
+    var t = e.touches;
+    if(t.length === 1){
+        dragging = true; pinching = false;
+        dragTX = t[0].clientX; dragTY = t[0].clientY;
+        dragPX = posX; dragPY = posY;
+        chars.classList.add('dragging');
+    }
+    if(t.length >= 2){
+        dragging = false; pinching = true;
+        pinchD0  = hypot(t);
+        pinchS0  = userScale;
+        pinchCX0 = (t[0].clientX + t[1].clientX) / 2;
+        pinchCY0 = (t[0].clientY + t[1].clientY) / 2;
+        pinchPX0 = posX;
+        pinchPY0 = posY;
+    }
+}
 
-                    /* Layer 1: camera feed */
-                    ctx.drawImage(video, 0, 0, w, h);
+function onTM(e){
+    var t = e.touches;
 
-                    /* Layer 2: WebGL canvas (AR objects) */
-                    ctx.drawImage(glCanvas, 0, 0, w, h);
+    if(dragging && !pinching && t.length === 1){
+        e.preventDefault();
+        posX = dragPX + (t[0].clientX - dragTX);
+        posY = dragPY + (t[0].clientY - dragTY);
+        applyPos();
+    }
 
-                    savedDataURL = tmp.toDataURL('image/png');
-                    log('Captured length: ' + savedDataURL.length);
+    if(pinching && t.length >= 2){
+        e.preventDefault();
+        var d = hypot(t);
+        var ns = Math.max(0.15, Math.min(6, pinchS0 * (d / pinchD0)));
 
-                    document.getElementById('preview-img').src = savedDataURL;
-                    document.getElementById('preview-modal').style.display = 'flex';
-                } catch (e) {
-                    log('Capture error: ' + e.message);
-                }
+        var cx = (t[0].clientX + t[1].clientX) / 2;
+        var cy = (t[0].clientY + t[1].clientY) / 2;
 
-                flash.style.display = 'none';
-            }, 100);
-        }
+        /* zoom toward pinch centre */
+        var oldW = baseW * pinchS0;
+        var oldH = baseH * pinchS0;
+        var fracX = (pinchCX0 - pinchPX0) / oldW;
+        var fracY = (pinchCY0 - pinchPY0) / oldH;
 
-        /* ---- 5-second timer ---- */
-        var timerRunning = false;
-        function startTimer() {
-            if (timerRunning) return;
-            timerRunning = true;
+        var newW = baseW * ns;
+        var newH = baseH * ns;
+        posX = cx - fracX * newW;
+        posY = cy - fracY * newH;
+        userScale = ns;
+        applyPos();
+    }
+}
 
-            var seconds = 5;
-            var cd  = document.getElementById('countdown-display');
-            var num = document.getElementById('cd-num');
-            cd.style.display = 'flex';
+function onTE(e){
+    var t = e.touches;
+    if(t.length < 2) pinching = false;
+    if(t.length < 1){ dragging = false; chars.classList.remove('dragging'); }
 
-            (function tick() {
-                if (seconds <= 0) {
-                    cd.style.display = 'none';
-                    capture();
-                    timerRunning = false;
-                    return;
-                }
-                num.textContent = seconds;
-                num.style.animation = 'none';
-                void num.offsetWidth;
-                num.style.animation = 'pop 0.5s ease';
-                seconds--;
-                setTimeout(tick, 1000);
-            })();
-        }
+    if(t.length === 1 && !pinching){
+        dragging = true;
+        dragTX = t[0].clientX; dragTY = t[0].clientY;
+        dragPX = posX; dragPY = posY;
+    }
+}
 
-        /* ---- save / close ---- */
-        function savePhoto() {
-            if (!savedDataURL) return;
-            var a = document.createElement('a');
-            a.href = savedDataURL;
-            a.download = 'ar-photo-' + Date.now() + '.png';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+/* ========== CAPTURE ========== */
+var savedDataURL = '';
 
-        function closePreview() {
-            document.getElementById('preview-modal').style.display = 'none';
-        }
+function capture(){
+    var flash = document.getElementById('flash');
+    flash.style.display = 'block';
 
-        /* ---- verify renderer settings ---- */
-        document.querySelector('a-scene').addEventListener('loaded', function () {
-            var r = this.renderer;
-            if (r) {
-                var gl = r.getContext();
-                var attrs = gl.getContextAttributes();
-                log('preserveDrawingBuffer: ' + (attrs ? attrs.preserveDrawingBuffer : '?'));
-                log('alpha: ' + (attrs ? attrs.alpha : '?'));
+    setTimeout(function(){
+        try{
+            var vw = video.videoWidth  || 1920;
+            var vh = video.videoHeight || 1080;
+            var sw = window.innerWidth;
+            var sh = window.innerHeight;
+
+            var canvas = document.createElement('canvas');
+            canvas.width  = vw;
+            canvas.height = vh;
+            var ctx = canvas.getContext('2d');
+
+            /* 1) draw full video frame */
+            ctx.drawImage(video, 0, 0, vw, vh);
+
+            /* 2) map screen coords → video coords (object-fit: cover) */
+            var screenAR = sw / sh;
+            var videoAR  = vw / vh;
+            var ms, mx, my;
+
+            if(videoAR > screenAR){
+                ms = vh / sh;
+                mx = (vw - sw * ms) / 2;
+                my = 0;
+            } else {
+                ms = vw / sw;
+                mx = 0;
+                my = (vh - sh * ms) / 2;
             }
-        });
-    </script>
+
+            var sz = displayedSize();
+            var dx = posX * ms + mx;
+            var dy = posY * ms + my;
+            var dw = sz.w * ms;
+            var dh = sz.h * ms;
+
+            ctx.drawImage(chars, dx, dy, dw, dh);
+
+            savedDataURL = canvas.toDataURL('image/jpeg', 0.92);
+            document.getElementById('preview-img').src = savedDataURL;
+            document.getElementById('preview-modal').style.display = 'flex';
+        }catch(err){
+            alert('Capture failed: ' + err.message);
+        }
+        flash.style.display = 'none';
+    }, 120);
+}
+window.capture = capture;
+
+/* ========== TIMER ========== */
+var timerRunning = false;
+function startTimer(){
+    if(timerRunning) return;
+    timerRunning = true;
+    var sec = 5;
+    var cd  = document.getElementById('countdown-display');
+    var num = document.getElementById('cd-num');
+    cd.style.display = 'flex';
+
+    (function tick(){
+        if(sec <= 0){
+            cd.style.display = 'none';
+            capture();
+            timerRunning = false;
+            return;
+        }
+        num.textContent = sec;
+        num.style.animation = 'none';
+        void num.offsetWidth;
+        num.style.animation = 'pop 0.5s ease';
+        sec--;
+        setTimeout(tick, 1000);
+    })();
+}
+window.startTimer = startTimer;
+
+/* ========== SAVE / CLOSE ========== */
+function savePhoto(){
+    if(!savedDataURL) return;
+    var a = document.createElement('a');
+    a.href = savedDataURL;
+    a.download = 'ar-photo-' + Date.now() + '.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+window.savePhoto = savePhoto;
+
+function closePreview(){
+    document.getElementById('preview-modal').style.display = 'none';
+}
+window.closePreview = closePreview;
+
+/* ========== HIDE HINT ========== */
+setTimeout(function(){
+    if(hint){hint.style.opacity='0';setTimeout(function(){hint.remove()},900);}
+}, 5000);
+
+})();
+</script>
 </body>
 </html>
