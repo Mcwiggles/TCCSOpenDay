@@ -12,13 +12,43 @@
 
         #camera{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:1}
 
-        /* The 3D Container */
         #characters {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 10;
+            background-color: transparent;
             --poster-color: transparent;
+        }
+
+        #loading-status {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 16px 28px;
+            border-radius: 16px;
+            font-size: 14px;
+            text-align: center;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        #loading-status.hidden { opacity: 0; pointer-events: none; }
+
+        #error-banner {
+            display: none;
+            position: fixed;
+            top: 60px; left: 10px; right: 10px;
+            z-index: 200;
+            background: rgba(220,38,38,0.92);
+            color: white;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: center;
         }
 
         #controls{
@@ -32,6 +62,7 @@
             width:74px;height:74px;border-radius:50%;
             background:rgba(255,255,255,0.25);border:4px solid white;
             cursor:pointer;display:flex;align-items:center;justify-content:center;
+            -webkit-tap-highlight-color:transparent;
         }
         .btn-shutter::after{content:'';width:56px;height:56px;border-radius:50%;background:white}
         .btn-shutter:active::after{background:#ccc}
@@ -41,30 +72,37 @@
             background:rgba(0,0,0,0.5);border:2px solid rgba(255,255,255,0.7);
             color:white;font-size:14px;font-weight:700;cursor:pointer;
             display:flex;align-items:center;justify-content:center;
+            -webkit-tap-highlight-color:transparent;
         }
+        .btn-round:active{background:rgba(0,0,0,0.7)}
 
         #flash{display:none;position:fixed;inset:0;background:white;z-index:999;pointer-events:none}
-
-        #preview-modal{
-            display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);
-            z-index:10000;flex-direction:column;align-items:center;justify-content:center;padding:20px;
-        }
-        #preview-modal img{max-width:90%;max-height:70vh;border-radius:12px;border: 2px solid #444;}
-        
-        .modal-actions{display:flex;gap:16px;margin-top:20px}
-        .btn-save{background:#22c55e; color:white; padding:12px 24px; border-radius:20px; border:none; font-weight:bold;}
-        .btn-dismiss{background:#6b7280; color:white; padding:12px 24px; border-radius:20px; border:none;}
 
         #hint{
             position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:100;
             background:rgba(0,0,0,0.6);color:white;padding:8px 16px;
             border-radius:20px;font-size:12px;pointer-events:none;
+            transition:opacity 0.8s;
         }
+
+        #preview-modal{
+            display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);
+            z-index:10000;flex-direction:column;align-items:center;justify-content:center;padding:20px;
+        }
+        #preview-modal img{max-width:90%;max-height:70vh;border-radius:12px;border:2px solid #444}
+        .modal-actions{display:flex;gap:16px;margin-top:20px}
+        .btn-save{background:#22c55e;color:white;padding:12px 24px;border-radius:20px;border:none;font-weight:bold;font-size:16px}
+        .btn-save:active{background:#16a34a}
+        .btn-dismiss{background:#6b7280;color:white;padding:12px 24px;border-radius:20px;border:none;font-size:16px}
+        .btn-dismiss:active{background:#4b5563}
     </style>
 </head>
 <body>
 
-<div id="hint">Rotate with 1 finger • Move/Zoom with 2 fingers</div>
+<div id="hint">Rotate with 1 finger · Pinch to zoom · 2 fingers to pan</div>
+<div id="loading-status">⏳ Loading 3D model…</div>
+<div id="error-banner"></div>
+
 <video id="camera" autoplay playsinline muted></video>
 
 <model-viewer 
@@ -73,10 +111,11 @@
     camera-controls 
     disable-tap
     auto-rotate
-    shadow-intensity="1"
-    exposure="1"
+    shadow-intensity="0"
+    exposure="1.2"
     interaction-prompt="none"
-    ar-status="not-presenting">
+    environment-image="neutral"
+    style="background-color: transparent;">
 </model-viewer>
 
 <div id="controls">
@@ -90,39 +129,83 @@
 <div id="preview-modal">
     <img id="preview-img" src="" alt="Photo">
     <div class="modal-actions">
-        <button class="btn-save" onclick="savePhoto()">💾 Save Photo</button>
+        <button class="btn-save" onclick="savePhoto()">💾 Save</button>
         <button class="btn-dismiss" onclick="closePreview()">✕ Close</button>
     </div>
 </div>
 
 <script>
-    const video = document.getElementById('camera');
-    const modelViewer = document.getElementById('characters');
+const video = document.getElementById('camera');
+const modelViewer = document.getElementById('characters');
+const loadingStatus = document.getElementById('loading-status');
+const errorBanner = document.getElementById('error-banner');
 
-    // Start Camera
-    async function startCamera(){
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-            });
-            video.srcObject = stream;
-        } catch (err) {
-            console.error("Camera error:", err);
-            alert("Please allow camera access to use the photo booth.");
-        }
+/* ===== CAMERA ===== */
+async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+            audio: false
+        });
+        video.srcObject = stream;
+    } catch (err) {
+        console.error('Camera error:', err);
+        showError('Camera access denied. Please allow camera and reload.');
     }
-    startCamera();
+}
+startCamera();
 
-    function toggleAutoRotate() {
-        modelViewer.autoRotate = !modelViewer.autoRotate;
+/* ===== MODEL EVENTS ===== */
+modelViewer.addEventListener('load', () => {
+    console.log('✅ Model loaded successfully');
+    loadingStatus.classList.add('hidden');
+    setTimeout(() => loadingStatus.remove(), 600);
+});
+
+modelViewer.addEventListener('error', (e) => {
+    console.error('❌ Model error:', e);
+    loadingStatus.textContent = '❌ Model failed to load';
+    showError(
+        'Could not load the 3D model.<br>' +
+        'The file host (cdn.tinyglb.com) may be blocked or unreachable.<br>' +
+        'Try hosting the .glb file on your own server or an approved CDN.'
+    );
+});
+
+modelViewer.addEventListener('progress', (e) => {
+    const pct = Math.round(e.detail.totalProgress * 100);
+    loadingStatus.textContent = '⏳ Loading model… ' + pct + '%';
+});
+
+/* Timeout fallback — if nothing happens in 10s, warn */
+setTimeout(() => {
+    if (loadingStatus && !loadingStatus.classList.contains('hidden')) {
+        loadingStatus.textContent = '⚠️ Model is taking too long…';
+        showError(
+            'Model hasn\'t loaded after 10 seconds.<br>' +
+            'Possible causes: blocked domain, CORS issue, or bad URL.<br>' +
+            'Open browser DevTools → Console/Network for details.'
+        );
     }
+}, 10000);
 
-    async function capture() {
-        const flash = document.getElementById('flash');
-        flash.style.display = 'block';
+function showError(msg) {
+    errorBanner.innerHTML = msg;
+    errorBanner.style.display = 'block';
+}
 
-        // 1. Grab the 3D model frame as a blob
-        const modelBlob = await modelViewer.toBlob({ idealAspect: true });
+/* ===== CONTROLS ===== */
+function toggleAutoRotate() {
+    modelViewer.autoRotate = !modelViewer.autoRotate;
+}
+
+/* ===== CAPTURE ===== */
+async function capture() {
+    const flash = document.getElementById('flash');
+    flash.style.display = 'block';
+
+    try {
+        const modelBlob = await modelViewer.toBlob({ idealAspect: false });
         const modelUrl = URL.createObjectURL(modelBlob);
         const modelImg = new Image();
         modelImg.src = modelUrl;
@@ -131,43 +214,56 @@
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // Match canvas to video dimensions
-            const vWidth = video.videoWidth;
-            const vHeight = video.videoHeight;
-            canvas.width = vWidth;
-            canvas.height = vHeight;
+            const vw = video.videoWidth || 1920;
+            const vh = video.videoHeight || 1080;
+            canvas.width = vw;
+            canvas.height = vh;
 
-            // 2. Draw Background (Camera)
-            ctx.drawImage(video, 0, 0, vWidth, vHeight);
+            /* Draw camera frame */
+            ctx.drawImage(video, 0, 0, vw, vh);
 
-            // 3. Draw Foreground (3D Model)
-            // We draw the model directly over the video. 
-            // Model-viewer's blob maintains transparency.
-            ctx.drawImage(modelImg, 0, 0, vWidth, vHeight);
+            /* Draw 3D model on top (transparent background preserved in PNG blob) */
+            ctx.drawImage(modelImg, 0, 0, vw, vh);
 
-            // 4. Show Preview
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
             document.getElementById('preview-img').src = dataUrl;
             document.getElementById('preview-modal').style.display = 'flex';
-            
+
             flash.style.display = 'none';
             URL.revokeObjectURL(modelUrl);
         };
-    }
 
-    function savePhoto() {
-        const link = document.createElement('a');
-        link.download = `ar-3d-photo-${Date.now()}.jpg`;
-        link.href = document.getElementById('preview-img').src;
-        link.click();
+        modelImg.onerror = () => {
+            flash.style.display = 'none';
+            showError('Failed to process the 3D snapshot.');
+        };
+    } catch (err) {
+        flash.style.display = 'none';
+        console.error('Capture error:', err);
+        showError('Capture failed: ' + err.message);
     }
+}
 
-    function closePreview() {
-        document.getElementById('preview-modal').style.display = 'none';
-    }
+function savePhoto() {
+    const src = document.getElementById('preview-img').src;
+    if (!src) return;
+    const a = document.createElement('a');
+    a.href = src;
+    a.download = 'ar-3d-photo-' + Date.now() + '.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
 
-    // Auto-hide hint
-    setTimeout(() => { document.getElementById('hint').style.display = 'none'; }, 4000);
+function closePreview() {
+    document.getElementById('preview-modal').style.display = 'none';
+}
+
+/* Hide hint */
+setTimeout(() => {
+    const h = document.getElementById('hint');
+    if (h) { h.style.opacity = '0'; setTimeout(() => h.remove(), 900); }
+}, 5000);
 </script>
 
 </body>
