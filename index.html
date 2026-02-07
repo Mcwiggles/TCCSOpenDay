@@ -81,12 +81,21 @@ body{touch-action:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;-
     background:rgba(200,0,0,0.85);color:white;padding:20px 32px;
     border-radius:16px;font-size:16px;text-align:center;display:none;
 }
+
+#toast{
+    position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:20000;
+    background:rgba(0,0,0,0.85);color:white;padding:12px 28px;
+    border-radius:22px;font-size:14px;text-align:center;
+    opacity:0;transition:opacity 0.4s;pointer-events:none;
+}
+#toast.show{opacity:1}
 </style>
 </head>
 <body>
 
 <div id="hint">👆 Drag to move · Pinch to resize</div>
-<div id="error-msg" ></div>
+<div id="error-msg"></div>
+<div id="toast"></div>
 
 <video id="camera" autoplay playsinline muted></video>
 
@@ -119,6 +128,16 @@ body{touch-action:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif;-
 var video = document.getElementById('camera');
 var chars = document.getElementById('characters');
 var hint  = document.getElementById('hint');
+
+/* ========== TOAST ========== */
+var toastTimer = null;
+function showToast(msg, duration){
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.classList.remove('show'); }, duration || 3000);
+}
 
 /* ========== CAMERA ========== */
 async function startCamera(){
@@ -232,7 +251,6 @@ function onTM(e){
         var cx = (t[0].clientX + t[1].clientX) / 2;
         var cy = (t[0].clientY + t[1].clientY) / 2;
 
-        /* zoom toward pinch centre */
         var oldW = baseW * pinchS0;
         var oldH = baseH * pinchS0;
         var fracX = (pinchCX0 - pinchPX0) / oldW;
@@ -260,7 +278,17 @@ function onTE(e){
 }
 
 /* ========== CAPTURE ========== */
+var savedBlob = null;
 var savedDataURL = '';
+
+function dataURLtoBlob(dataURL){
+    var parts = dataURL.split(',');
+    var mime  = parts[0].match(/:(.*?);/)[1];
+    var raw   = atob(parts[1]);
+    var arr   = new Uint8Array(raw.length);
+    for(var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return new Blob([arr], {type: mime});
+}
 
 function capture(){
     var flash = document.getElementById('flash');
@@ -278,10 +306,8 @@ function capture(){
             canvas.height = vh;
             var ctx = canvas.getContext('2d');
 
-            /* 1) draw full video frame */
             ctx.drawImage(video, 0, 0, vw, vh);
 
-            /* 2) map screen coords → video coords (object-fit: cover) */
             var screenAR = sw / sh;
             var videoAR  = vw / vh;
             var ms, mx, my;
@@ -305,10 +331,11 @@ function capture(){
             ctx.drawImage(chars, dx, dy, dw, dh);
 
             savedDataURL = canvas.toDataURL('image/jpeg', 0.92);
+            savedBlob = dataURLtoBlob(savedDataURL);
             document.getElementById('preview-img').src = savedDataURL;
             document.getElementById('preview-modal').style.display = 'flex';
         }catch(err){
-            alert('Capture failed: ' + err.message);
+            showToast('Capture failed: ' + err.message, 4000);
         }
         flash.style.display = 'none';
     }, 120);
@@ -343,14 +370,63 @@ function startTimer(){
 window.startTimer = startTimer;
 
 /* ========== SAVE / CLOSE ========== */
-function savePhoto(){
-    if(!savedDataURL) return;
-    var a = document.createElement('a');
-    a.href = savedDataURL;
-    a.download = 'ar-photo-' + Date.now() + '.jpg';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+async function savePhoto(){
+    if(!savedBlob && !savedDataURL) return;
+
+    /* Method 1: Web Share API (best for mobile) */
+    if(navigator.canShare){
+        try{
+            var file = new File([savedBlob], 'ar-photo-' + Date.now() + '.jpg', {type:'image/jpeg'});
+            if(navigator.canShare({files:[file]})){
+                await navigator.share({
+                    files:[file],
+                    title:'AR Photo',
+                    text:'Photo from AR Photo Booth'
+                });
+                showToast('✅ Shared / saved!');
+                return;
+            }
+        }catch(e){
+            if(e.name === 'AbortError') return; /* user cancelled share sheet */
+            /* fall through to next method */
+        }
+    }
+
+    /* Method 2: Blob download link */
+    try{
+        var url = URL.createObjectURL(savedBlob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'ar-photo-' + Date.now() + '.jpg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+        showToast('✅ Downloading…');
+        return;
+    }catch(e){
+        /* fall through */
+    }
+
+    /* Method 3: Open in new tab (user can long-press to save) */
+    try{
+        var w = window.open();
+        if(w){
+            w.document.write(
+                '<html><head><title>AR Photo</title><style>body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:100vh}</style></head><body>' +
+                '<img src="' + savedDataURL + '">' +
+                '<p style="position:fixed;bottom:20px;left:0;right:0;text-align:center;color:#aaa;font-family:sans-serif">Long-press image to save</p>' +
+                '</body></html>'
+            );
+            w.document.close();
+            showToast('📷 Long-press the image to save');
+            return;
+        }
+    }catch(e){
+        /* fall through */
+    }
+
+    showToast('⚠️ Could not save. Long-press preview image instead.', 4000);
 }
 window.savePhoto = savePhoto;
 
